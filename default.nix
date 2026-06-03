@@ -90,10 +90,10 @@ rustPlatform.buildRustPackage.override { stdenv = clangStdenv; } rec {
 
   disallowedReferences = [ SKIA_SOURCE_DIR ];
 
-  meta = with lib; {
+  meta = {
     description = "A simple CLI utility to add rounded borders, padding, and shadows to images.";
     homepage = "https://github.com/n3oney/shadower";
-    license = with licenses; [ gpl3 ];
+    license = with lib.licenses; [ gpl3 ];
     maintainers = [
       {
         email = "neo@neoney.dev";
