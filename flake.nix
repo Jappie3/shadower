@@ -11,77 +11,39 @@
       nixpkgs,
     }:
     let
-      cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
-      supportedSystems = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
-      forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems (system: f system);
+      inherit (nixpkgs) lib;
+      cargoToml = fromTOML (builtins.readFile ./Cargo.toml);
+      forAllSystems =
+        f: lib.genAttrs lib.systems.flakeExposed (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      overlay = final: prev: {
-        "${cargoToml.package.name}" = final.callPackage ./. { };
-      };
+      packages = forAllSystems (pkgs: {
+        "${cargoToml.package.name}" = pkgs.callPackage ./. { };
+        default = pkgs.callPackage ./. { };
+      });
 
-      packages = forAllSystems (
-        system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ self.overlay ];
-          };
-        in
-        {
-          "${cargoToml.package.name}" = pkgs."${cargoToml.package.name}";
-        }
-      );
+      checks = forAllSystems (pkgs: {
+        format =
+          pkgs.runCommand "check-format"
+            {
+              buildInputs = with pkgs; [
+                rustfmt
+                cargo
+              ];
+            }
+            ''
+              ${pkgs.rustfmt}/bin/cargo-fmt fmt --manifest-path ${./.}/Cargo.toml -- --check
+              ${pkgs.nixpkgs-fmt}/bin/nixpkgs-fmt --check ${./.}
+              touch $out # it worked!
+            '';
+        "${cargoToml.package.name}" = pkgs.callPackage ./. { };
+      });
 
-      defaultPackage = forAllSystems (
-        system:
-        (import nixpkgs {
-          inherit system;
-          overlays = [ self.overlay ];
-        })."${cargoToml.package.name}"
-      );
-
-      checks = forAllSystems (
-        system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [
-              self.overlay
-            ];
-          };
-        in
-        {
-          format =
-            pkgs.runCommand "check-format"
-              {
-                buildInputs = with pkgs; [
-                  rustfmt
-                  cargo
-                ];
-              }
-              ''
-                ${pkgs.rustfmt}/bin/cargo-fmt fmt --manifest-path ${./.}/Cargo.toml -- --check
-                ${pkgs.nixpkgs-fmt}/bin/nixpkgs-fmt --check ${./.}
-                touch $out # it worked!
-              '';
-          "${cargoToml.package.name}" = pkgs."${cargoToml.package.name}";
-        }
-      );
       devShell = forAllSystems (
-        system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ self.overlay ];
-          };
-        in
+        pkgs:
         pkgs.mkShell.override { stdenv = pkgs.clang18Stdenv; } {
           inputsFrom = [
-            pkgs."${cargoToml.package.name}"
+            self.packages.${pkgs.stdenv.hostPlatform.system}."${cargoToml.package.name}"
           ];
           NIX_LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
             pkgs.clangStdenv.cc.cc
