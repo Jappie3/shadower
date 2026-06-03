@@ -59,10 +59,12 @@ rustPlatform.buildRustPackage.override { stdenv = clangStdenv; } rec {
       repo = fetchFromGitHub {
         owner = "rust-skia";
         repo = "skia";
-        # see rust-skia:skia-bindings/Cargo.toml#package.metadata skia
-        rev = "m114-0.62.1";
-        sha256 = "sha256-w5dw/lGm40gKkHPR1ji/L82Oa808Kuh8qaCeiqBLkLw=";
+        # see rust-skia:skia/Cargo.toml#package.metadata skia
+        rev = "m148-0.97.0";
+        sha256 = "sha256-uFnYX6ZDg+cJwLyCe6IGB6M3aCyI/+q2aYP4JfHm544=";
       };
+      # see DEPS in rust-skia/skia at m148-0.97.0
+      # https://github.com/rust-skia/skia/blob/3f465e408337f13a543849ec70c767b2c5e6eeb3/DEPS
       externals = linkFarm "skia-externals" (
         lib.mapAttrsToList (name: value: {
           inherit name;

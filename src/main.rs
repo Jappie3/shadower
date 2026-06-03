@@ -10,7 +10,7 @@ use math::parse_math;
 use skia_safe::image_filters::drop_shadow_only;
 use skia_safe::EncodedImageFormat;
 use skia_safe::Surface;
-use skia_safe::{Color, Data, IRect, Image, Point, RRect, Rect};
+use skia_safe::{Color, Data, Image, Point, RRect, Rect};
 
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use clap::Parser;
 
 fn new_canvas(width: i32, height: i32) -> Surface {
-    let mut surface = Surface::new_raster_n32_premul((width, height)).expect("no surface!");
+    let mut surface = skia_safe::surfaces::raster_n32_premul((width, height)).expect("no surface!");
     surface.canvas().clear(Color::TRANSPARENT);
     surface
 }
@@ -242,47 +242,45 @@ fn main() -> Result<()> {
 
     let filter = drop_shadow_only(
         (
-            parse_math(args.offset_x, orig_width, orig_height),
-            parse_math(args.offset_y, orig_width, orig_height),
+            parse_math(args.offset_x.clone(), orig_width, orig_height),
+            parse_math(args.offset_y.clone(), orig_width, orig_height),
         ),
         (
-            parse_math(args.blur_x, orig_width, orig_height),
-            parse_math(args.blur_y, orig_width, orig_height),
+            parse_math(args.blur_x.clone(), orig_width, orig_height),
+            parse_math(args.blur_y.clone(), orig_width, orig_height),
         ),
         shadow_color,
+        None,
         None,
         None,
     )
     .context("Failed to create drop shadow")?;
 
-    let shadow_image = padded_image
-        .new_with_filter(
-            &filter,
-            IRect {
-                left: 0,
-                top: 0,
-                right: padded_image.width(),
-                bottom: padded_image.height(),
-            },
-            IRect {
-                left: 0,
-                top: 0,
-                right: padded_image.width(),
-                bottom: padded_image.height(),
-            },
-        )
-        .context("Failed to add drop shadow")?
-        .0;
+    let blur_x_val = parse_math(args.blur_x.clone(), orig_width, orig_height) as i32;
+    let blur_y_val = parse_math(args.blur_y.clone(), orig_width, orig_height) as i32;
+    let off_x_val = parse_math(args.offset_x.clone(), orig_width, orig_height) as i32;
+    let off_y_val = parse_math(args.offset_y.clone(), orig_width, orig_height) as i32;
+    let margin = (blur_x_val.max(blur_y_val) * 3 + off_x_val.abs().max(off_y_val.abs())) + 4;
 
-    let mut canvas = new_canvas(padded_image.width(), padded_image.height());
+    let mut canvas = new_canvas(
+        padded_image.width() + margin * 2,
+        padded_image.height() + margin * 2,
+    );
 
-    canvas.canvas().draw_image(shadow_image, (0, 0), None);
+    let mut shadow_paint = skia_safe::Paint::default();
+    shadow_paint.set_image_filter(filter);
 
-    canvas.canvas().draw_image(padded_image, (0, 0), None);
+    canvas
+        .canvas()
+        .draw_image(&padded_image, (margin, margin), Some(&shadow_paint));
+
+    canvas
+        .canvas()
+        .draw_image(&padded_image, (margin, margin), None);
 
     let image = canvas.image_snapshot();
     let data = image
-        .encode_to_data(EncodedImageFormat::PNG)
+        .encode(None, EncodedImageFormat::PNG, None)
         .context("Failed to encode image")?;
 
     let bytes = data.as_bytes();
