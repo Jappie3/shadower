@@ -17,40 +17,45 @@
   linkFarm,
   fontconfig,
   llvmPackages,
-}: let
+}:
+let
   cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
 in
-  rustPlatform.buildRustPackage.override {stdenv = clangStdenv;} rec {
-    pname = cargoToml.package.name;
-    version = cargoToml.package.version;
+rustPlatform.buildRustPackage.override { stdenv = clangStdenv; } rec {
+  pname = cargoToml.package.name;
+  version = cargoToml.package.version;
 
-    src = ./.;
+  src = ./.;
 
-    cargoLock = {
-      lockFile = ./Cargo.lock;
-    };
+  cargoLock = {
+    lockFile = ./Cargo.lock;
+  };
 
-    buildInputs = [
-      pkg-config
-      fontconfig
-      llvmPackages.libclang
-      llvmPackages.libcxxClang
-    ];
-    checkInputs = [cargo rustc];
+  buildInputs = [
+    pkg-config
+    fontconfig
+    llvmPackages.libclang
+    llvmPackages.libcxxClang
+  ];
+  checkInputs = [
+    cargo
+    rustc
+  ];
 
-    LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
+  LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
 
-    nativeBuildInputs = [
-      makeWrapper
-      pkg-config
-      rustfmt
-      rustc
-      cargo
-      removeReferencesTo
-      python3 # for skia :)
-    ];
+  nativeBuildInputs = [
+    makeWrapper
+    pkg-config
+    rustfmt
+    rustc
+    cargo
+    removeReferencesTo
+    python3 # for skia :)
+  ];
 
-    SKIA_SOURCE_DIR = let
+  SKIA_SOURCE_DIR =
+    let
       repo = fetchFromGitHub {
         owner = "rust-skia";
         repo = "skia";
@@ -58,45 +63,45 @@ in
         rev = "m114-0.62.1";
         sha256 = "sha256-w5dw/lGm40gKkHPR1ji/L82Oa808Kuh8qaCeiqBLkLw=";
       };
-      externals = linkFarm "skia-externals" (lib.mapAttrsToList
-        (name: value: {
+      externals = linkFarm "skia-externals" (
+        lib.mapAttrsToList (name: value: {
           inherit name;
           path = fetchgit value;
-        })
-        (lib.importJSON ./skia-externals.json));
+        }) (lib.importJSON ./skia-externals.json)
+      );
     in
-      runCommand "source" {} ''
-        cp -R ${repo} $out
-        chmod -R +w $out
-        ln -s ${externals} $out/third_party/externals
-      '';
-
-    SKIA_GN_COMMAND = "${gn}/bin/gn";
-    SKIA_NINJA_COMMAND = "${ninja}/bin/ninja";
-
-    doCheck = true;
-    CARGO_BUILD_INCREMENTAL = "false";
-    RUST_BACKTRACE = "full";
-
-    postFixup = ''
-      remove-references-to -t "$SKIA_SOURCE_DIR" \
-        $out/bin/shadower
+    runCommand "source" { } ''
+      cp -R ${repo} $out
+      chmod -R +w $out
+      ln -s ${externals} $out/third_party/externals
     '';
 
-    disallowedReferences = [SKIA_SOURCE_DIR];
+  SKIA_GN_COMMAND = "${gn}/bin/gn";
+  SKIA_NINJA_COMMAND = "${ninja}/bin/ninja";
 
-    meta = with lib; {
-      description = "A simple CLI utility to add rounded borders, padding, and shadows to images.";
-      homepage = "https://github.com/n3oney/shadower";
-      license = with licenses; [gpl3];
-      maintainers = [
-        {
-          email = "neo@neoney.dev";
-          github = "n3oney";
-          githubId = 30625554;
-          name = "Michał Minarowski";
-        }
-      ];
-      mainProgram = "shadower";
-    };
-  }
+  doCheck = true;
+  CARGO_BUILD_INCREMENTAL = "false";
+  RUST_BACKTRACE = "full";
+
+  postFixup = ''
+    remove-references-to -t "$SKIA_SOURCE_DIR" \
+      $out/bin/shadower
+  '';
+
+  disallowedReferences = [ SKIA_SOURCE_DIR ];
+
+  meta = with lib; {
+    description = "A simple CLI utility to add rounded borders, padding, and shadows to images.";
+    homepage = "https://github.com/n3oney/shadower";
+    license = with licenses; [ gpl3 ];
+    maintainers = [
+      {
+        email = "neo@neoney.dev";
+        github = "n3oney";
+        githubId = 30625554;
+        name = "Michał Minarowski";
+      }
+    ];
+    mainProgram = "shadower";
+  };
+}
