@@ -84,7 +84,7 @@
             overlays = [ self.overlay ];
           };
         in
-        pkgs.mkShell.override { stdenv = pkgs.clang15Stdenv; } {
+        pkgs.mkShell.override { stdenv = pkgs.clang18Stdenv; } {
           inputsFrom = [
             pkgs."${cargoToml.package.name}"
           ];
